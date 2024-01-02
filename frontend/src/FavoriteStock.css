@@ -1,0 +1,15 @@
+/* FavoriteStock.css */
+.favorite-stock-container {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 10px;
+  width: 300px; /* Fixed width */
+  text-align: center;
+}
+
+/* Search.css */
+.favorites-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}

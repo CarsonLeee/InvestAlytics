@@ -1,0 +1,36 @@
+/* Ticker.css */
+.ticker-wrap {
+    position: fixed; /* Changed from absolute to fixed for a consistent position */
+    top: 0;
+    left: 0; /* Ensuring it starts from the left edge */
+    width: 100%;
+    overflow: hidden;
+    background-color: #f1f1f1;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000; /* Ensure it's above other content */
+}
+
+.ticker {
+    display: flex;
+    width: 100%; /* Set width to match the container */
+    animation: tickerMove 40s linear infinite;
+}
+
+.ticker-item {
+    padding: 0 15px;
+    white-space: nowrap;
+}
+
+@keyframes tickerMove {
+    0% { transform: translateX(100%); } /* Start from fully right */
+    100% { transform: translateX(-100%); } /* End fully left */
+}
+
+@media (max-width: 768px) {
+    .ticker { width: 90%; }
+}
+  
+@media (max-width: 480px) {
+    .ticker { width: 100%; }
+}
