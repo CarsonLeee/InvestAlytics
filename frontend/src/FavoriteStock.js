@@ -17,7 +17,7 @@ const FavoriteStock = ({ symbol, onClick }) => {
 
   useEffect(() => {
     const fetchStockData = async () => {
-      const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
+      const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
       const chartUrl = `https://cloud.iexapis.com/stable/stock/${symbol}/chart/1m?token=${apiKey}`;
       const quoteUrl = `https://cloud.iexapis.com/stable/stock/${symbol}/quote?token=${apiKey}`;
 

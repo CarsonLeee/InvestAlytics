@@ -27,10 +27,11 @@ const Search = ({ navigateTo }) => {
     localStorage.removeItem("userToken");
     navigateTo("login"); // Navigate to login screen
   };
+  
   useEffect(() => {
     const fetchTickerData = async () => {
       try {
-        const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
+        const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
         const url = `https://cloud.iexapis.com/stable/stock/market/list/mostactive?token=${apiKey}&listLimit=1000`; // Fetch most active 100 stocks
         const response = await axios.get(url);
         const formattedData = response.data.map((stock) => ({
@@ -82,7 +83,7 @@ const Search = ({ navigateTo }) => {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchTerm) {
-        const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
+        const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
         const url = `https://cloud.iexapis.com/stable/search/${searchTerm}?token=${apiKey}`;
         axios
           .get(url)

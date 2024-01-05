@@ -41,7 +41,9 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
   const [stockInfo, setStockInfo] = useState({ high: 0, low: 0, current: 0 });
   const [selectedTimePeriod, setSelectedTimePeriod] = useState("1m");
   const [tickerData, setTickerData] = useState([]);
+  const [fullStockData, setFullStockData] = useState([]);
   const [prediction, setPrediction] = useState(""); // State for overall prediction
+  const [taPrediction, setTAPrediction] = useState(""); // State for Technical Analysis Prediction
   const [isFavorite, setIsFavorite] = useState(
     favorites.includes(selectedStock)
   );
@@ -66,6 +68,63 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
     }
   };
 
+  const handleMLPrediction = async () => {
+    if (selectedStock !== "TSLA") {
+      alert("ML prediction is only available for TSLA stock.");
+      return;
+    }
+
+    if (fullStockData.length === 0) {
+      alert("No data available for prediction.");
+      return;
+    }
+
+    // Get the latest available full data point
+    const latestDataPoint = fullStockData[fullStockData.length - 1];
+
+    console.log("Latest Full Data Point:", latestDataPoint); // Debugging
+
+    // Check if all required fields are available
+    const requiredFields = ["open", "high", "low", "close", "volume"];
+    const missingFields = requiredFields.filter(
+      (field) => latestDataPoint[field] === undefined
+    );
+
+    if (missingFields.length > 0) {
+      alert(
+        "Data is incomplete for prediction. Missing fields: " +
+          missingFields.join(", ")
+      );
+      return;
+    }
+
+    const features = {
+      Open: latestDataPoint.open,
+      High: latestDataPoint.high,
+      Low: latestDataPoint.low,
+      Close: latestDataPoint.close,
+      Volume: latestDataPoint.volume,
+    };
+
+    const lastClosePrice = fullStockData[fullStockData.length - 1].close; // Get the last closing price
+
+    try {
+      const response = await axios.post("http://localhost:3001/predict", {
+        features,
+        stockSymbol: selectedStock,
+        lastClose: lastClosePrice, // Pass the last closing price in the request
+      });
+
+      console.log("Received prediction response:", response);
+
+      // Assuming the prediction is returned in the response
+      setPrediction(response.data.prediction);
+    } catch (error) {
+      console.error("Error fetching ML prediction:", error);
+      alert("Failed to fetch prediction");
+    }
+  };
+
   const handleToggleFavorite = async () => {
     const userId = localStorage.getItem("userId");
     try {
@@ -82,7 +141,7 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
       }
       setIsFavorite(!isFavorite); // Toggle local favorite state
       if (onFavoriteAdded) {
-        onFavoriteAdded(); // Trigger re-fetching of favorites in parent component
+        onFavoriteAdded(); // Trigger re-fetching of favorites in the parent component
       }
     } catch (error) {
       console.error("Error updating favorites:", error);
@@ -107,81 +166,41 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
   const calculatePrediction = async () => {
     let weightedScore = 0;
     const weights = {
-        "Simple Moving Average": 1.1,
-        "Exponential Moving Average": 1.3,
-        "Relative Strength Index": 1.5,
-        "Bollinger Bands": 1.2,
-        "MACD": 1.4,
-        "Stochastic Oscillator": 1.2,
-        "Fibonacci Retracement": 1.0,
+      "Simple Moving Average": 1.1,
+      "Exponential Moving Average": 1.3,
+      "Relative Strength Index": 1.5,
+      "Bollinger Bands": 1.2,
+      MACD: 1.4,
+      "Stochastic Oscillator": 1.2,
+      "Fibonacci Retracement": 1.0,
     };
-    const threshold = 3; // Define threshold for buy/sell decision
+    const threshold = 3; // Define the threshold for buy/sell decision
 
     try {
-        for (const analysisType of analysisOptions) {
-            const trend = await handleAnalysisOptionClick(analysisType, false);
-            const weight = weights[analysisType];
+      for (const analysisType of analysisOptions) {
+        const trend = await handleAnalysisOptionClick(analysisType, false);
+        const weight = weights[analysisType];
 
-            if (trend.toLowerCase() === "bullish") {
-                weightedScore += weight;
-            } else if (trend.toLowerCase() === "bearish") {
-                weightedScore -= weight;
-            }
-            // Neutral trends do not affect the score
+        if (trend.toLowerCase() === "bullish") {
+          weightedScore += weight;
+        } else if (trend.toLowerCase() === "bearish") {
+          weightedScore -= weight;
         }
-
-        let decision = "Hold Stock"; // Default decision
-        if (weightedScore >= threshold) {
-            decision = "Buy Stock";
-        } else if (weightedScore <= -threshold) {
-            decision = "Sell Stock";
-        }
-
-        setPrediction(decision);
-    } catch (error) {
-        setPrediction("Error in prediction");
-    }
-};
-
-  
-  useEffect(() => {
-    const fetchTickerData = async () => {
-      const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
-      const symbols =
-        "AAPL,MSFT,AMZN,GOOGL,FB,BABA,TSLA,V,JPM,JNJ,BRK.A,XOM,BAC,PG,WMT,DIS,VZ,PFE,CVX,KO,PEP,CSCO,MRK,INTC,CMCSA";
-      const url = `https://cloud.iexapis.com/stable/stock/market/batch?symbols=${symbols}&types=quote,previous&token=${apiKey}`;
-
-      try {
-        const response = await axios.get(url);
-      } catch (error) {
-        console.error("Error fetching ticker data: ", error);
+        // Neutral trends do not affect the score
       }
-    };
 
-    fetchTickerData();
-  }, []);
-  useEffect(() => {
-    const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
-    const url = `https://cloud.iexapis.com/stable/stock/${selectedStock}/chart/${selectedTimePeriod}?token=${apiKey}`;
+      let decision = "Hold Stock"; // Default decision
+      if (weightedScore >= threshold) {
+        decision = "Buy Stock";
+      } else if (weightedScore <= -threshold) {
+        decision = "Sell Stock";
+      }
 
-    axios
-      .get(url)
-      .then((response) => {
-        if (response.data) {
-          const chartData = parseChartData(response.data);
-          setStockData(chartData);
-          const lastDayData = response.data[response.data.length - 1];
-          setStockInfo({
-            high: lastDayData.high,
-            low: lastDayData.low,
-            current: lastDayData.close,
-          });
-        }
-      })
-      .catch((error) =>
-        console.error("Error fetching stock time series data: ", error)
-      );
-  }, [selectedStock, selectedTimePeriod]);
+      setTAPrediction(decision); // Update TA prediction state
+    } catch (error) {
+      setTAPrediction("Error in prediction");
+    }
+  };
 
   const parseChartData = (data) => {
     const chartData = {
@@ -195,13 +214,50 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
         },
       ],
     };
+    const fullData = [];
 
     data.forEach((dayData) => {
       chartData.labels.push(dayData.date);
-      chartData.datasets[0].data.push(dayData.close);
+      chartData.datasets[0].data.push(dayData.close); // Only push closing price here
+      fullData.push({
+        open: dayData.open,
+        high: dayData.high,
+        low: dayData.low,
+        close: dayData.close,
+        volume: dayData.volume,
+      });
     });
 
-    return chartData;
+    return { chartData, fullData };
+  };
+
+  const fetchChartData = async () => {
+    try {
+      const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
+      const url = `https://cloud.iexapis.com/stable/stock/${selectedStock}/chart/${selectedTimePeriod}?token=${apiKey}`;
+
+      const response = await axios.get(url);
+      if (response.data) {
+        console.log("Fetched Data:", response.data); // Log the fetched data
+        const { chartData, fullData } = parseChartData(response.data);
+        setStockData(chartData); // Set chart data for rendering the chart
+        setFullStockData(fullData); // Set full data for predictions
+
+        if (response.data.length > 0) {
+          const lastDayData = response.data[response.data.length - 1];
+          console.log("Last Day Data:", lastDayData); // Log the last day's data
+          setStockInfo({
+            high: lastDayData.high,
+            low: lastDayData.low,
+            current: lastDayData.close,
+          });
+        }
+      } else {
+        console.log("No data received.");
+      }
+    } catch (error) {
+      console.error("Error fetching stock time series data:", error);
+    }
   };
 
   const options = {
@@ -249,10 +305,10 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
           console.error("Unrecognized analysis type:", analysisType);
           return "error";
       }
-  
+
       const response = await axios.get(url);
       console.log(`Trend for ${analysisType}:`, response.data.trend); // Log the trend
-  
+
       if (showAlert) {
         alert(`Trend for ${analysisType}: ${response.data.trend}`);
       }
@@ -262,7 +318,28 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
       return "error"; // Return a default value in case of an error
     }
   };
-  
+
+  useEffect(() => {
+    const fetchTickerData = async () => {
+      const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
+      const symbols =
+        "AAPL,MSFT,AMZN,GOOGL,FB,BABA,TSLA,V,JPM,JNJ,BRK.A,XOM,BAC,PG,WMT,DIS,VZ,PFE,CVX,KO,PEP,CSCO,MRK,INTC,CMCSA";
+      const url = `https://cloud.iexapis.com/stable/stock/market/batch?symbols=${symbols}&types=quote,previous&token=${apiKey}`;
+
+      try {
+        const response = await axios.get(url);
+        setTickerData(response.data);
+      } catch (error) {
+        console.error("Error fetching ticker data: ", error);
+      }
+    };
+
+    fetchTickerData();
+  }, []);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [selectedStock, selectedTimePeriod]);
 
   return (
     <div
@@ -305,6 +382,12 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
           <p>
             <strong>Neutral:</strong> Hold Stock
           </p>
+          <p>
+            <strong>ML:</strong> Machine Learning
+          </p>
+          <p>
+            <strong>TA:</strong> Technical Analysis
+          </p>
         </div>
         <div style={{ width: "600px", height: "300px", marginLeft: "20px" }}>
           <h2 style={{ textAlign: "center" }}>{selectedStock} Stock Chart</h2>
@@ -323,7 +406,10 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
             <strong>Current:</strong> {stockInfo.current}
           </p>
           <p>
-            <strong>Verdict:</strong> {prediction}
+            <strong>ML Prediction:</strong> {prediction}
+          </p>
+          <p>
+            <strong>TA Prediction:</strong> {taPrediction}
           </p>
         </div>
       </div>
@@ -347,8 +433,9 @@ const Stock = ({ selectedStock, onClose, onFavoriteAdded, favorites }) => {
         ))}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
         <button onClick={calculatePrediction}>Calculate Prediction</button>
+        <button onClick={handleMLPrediction}>ML Prediction</button>
       </div>
     </div>
   );

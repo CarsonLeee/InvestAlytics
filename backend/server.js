@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const User = require("./User");
 const cors = require("cors");
 const app = express();
+const { spawn } = require("child_process");
 const { fetchStockDataAndCalculateSMA } = require("./SimpleMovingAverage"); // Importing the function
 const { fetchStockDataAndCalculateEMA } = require("./ExponentialMovingAverage"); // Import the EMA function
 const { fetchStockDataAndCalculateRSI } = require("./RelativeStrengthIndex");
@@ -65,7 +66,7 @@ app.delete("/user/:userId/favorites", async (req, res) => {
     if (!user) {
       return res.status(404).send("User not found");
     }
-    user.favorites = user.favorites.filter(symbol => symbol !== stockSymbol);
+    user.favorites = user.favorites.filter((symbol) => symbol !== stockSymbol);
     await user.save();
     res.status(200).send("Stock removed from favorites");
   } catch (error) {
@@ -137,7 +138,7 @@ app.post("/reset-password", async (req, res) => {
 
 app.get("/sma/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const result = await fetchStockDataAndCalculateSMA(
@@ -154,7 +155,7 @@ app.get("/sma/:stockSymbol/:period", async (req, res) => {
 
 app.get("/ema/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const result = await fetchStockDataAndCalculateEMA(
@@ -171,7 +172,7 @@ app.get("/ema/:stockSymbol/:period", async (req, res) => {
 
 app.get("/rsi/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee";
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684";
 
   try {
     const result = await fetchStockDataAndCalculateRSI(
@@ -188,7 +189,7 @@ app.get("/rsi/:stockSymbol/:period", async (req, res) => {
 
 app.get("/bollinger-bands/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const result = await fetchStockDataAndCalculateBollingerBands(
@@ -205,7 +206,7 @@ app.get("/bollinger-bands/:stockSymbol/:period", async (req, res) => {
 
 app.get("/macd/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const result = await fetchStockDataAndCalculateMACD(
@@ -222,7 +223,7 @@ app.get("/macd/:stockSymbol/:period", async (req, res) => {
 
 app.get("/stochastic/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const stochastic = await fetchStockDataAndCalculateStochastic(
@@ -239,7 +240,7 @@ app.get("/stochastic/:stockSymbol/:period", async (req, res) => {
 
 app.get("/fibonacci/:stockSymbol/:period", async (req, res) => {
   const { stockSymbol, period } = req.params;
-  const apiKey = "pk_302c7bd6ee464d738f364961b88569ee"; // Your API key
+  const apiKey = "pk_fa779df6b79c4e499e1d7114377e9684"; // Your API key
 
   try {
     const fibonacciLevels = await fetchStockDataAndCalculateFibonacci(
@@ -252,6 +253,45 @@ app.get("/fibonacci/:stockSymbol/:period", async (req, res) => {
     console.error("Error:", error.message);
     res.status(500).send("Error processing request");
   }
+});
+
+app.post("/predict", async (req, res) => {
+  console.log("Received features:", req.body.features);
+  const stockSymbol = req.body.stockSymbol;
+
+  // Check if the stock symbol is Tesla
+  if (stockSymbol !== "TSLA") {
+    return res.status(400).send("ML prediction is not available for this stock.");
+  }
+
+  let scriptOutput = "";
+
+  const lastClosePrice = req.body.lastClose; // Add this line to receive the last closing price
+
+  const pythonProcess = spawn("python", [
+    "./ml_predict_script.py",
+    JSON.stringify(req.body.features),
+    lastClosePrice.toString()  // Pass the last closing price to the Python script
+  ]);
+
+  pythonProcess.stdout.on("data", (data) => {
+    console.log("Prediction:", data.toString());
+    scriptOutput += data.toString();
+  });
+
+  pythonProcess.stderr.on("data", (data) => {
+    console.error(`stderr: ${data}`);
+    scriptOutput += `Error: ${data}`;
+  });
+
+  pythonProcess.on('close', (code) => {
+    console.log(`child process exited with code ${code}`);
+    if (code === 0) {
+      res.send({ prediction: scriptOutput.trim() });
+    } else {
+      res.status(500).send(scriptOutput);
+    }
+  });
 });
 
 const port = process.env.PORT || 3001;
